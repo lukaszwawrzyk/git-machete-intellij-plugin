@@ -45,44 +45,43 @@ jobs:
       - store_artifacts:
           path: build/distributions/
           destination: .
-      - run:
-          name: Verify plugin artifact contents
-          command: ./scripts/verify-artifact-contents
-      - run:
-          name: Verify binary compatibility with supported IntelliJ versions
-          command: ./scripts/verify-binary-compatibility
-
-      - run:
-          name: Run UI tests against 2020.1 (earliest supported)
-          command: ./scripts/run-ui-tests 2020.1
-      # We can't just store the results once at the end since they get overwritten with each UI test run.
-      - store_test_results:
-          path: uiTests/build/test-results/
-      - run:
-          name: Run UI tests against 2020.1.2 (latest non-EAP & our build target)
-          command: ./scripts/run-ui-tests 2020.1.2
-      - store_test_results:
-          path: uiTests/build/test-results/
-
       - persist_to_workspace:
           root: .
           paths: ['*']
+#      - run:
+#          name: Verify plugin artifact contents
+#          command: ./scripts/verify-artifact-contents
+#      - run:
+#          name: Verify binary compatibility with supported IntelliJ versions
+#          command: ./scripts/verify-binary-compatibility
 
-      - run:
-          # See Lombok config in build.gradle for why this step is necessary.
-          # We're running this at the very end so that the recompiled code doesn't end up in the plugin artifact.
-          name: Recompile production code with delombok
-          # Apparently we need to kill the already-running daemons first, otherwise we might get an OOM.
-          # New daemons will be spawned anyway since passing `LOMBOK_PROVIDED_BY=gradle-plugin` changes Gradle configuration.
-          command: |
-            ./gradlew --stop
-            LOMBOK_PROVIDED_BY=gradle-plugin ./gradlew --max-workers=2 compileJava
-      - run:
-          # javadoc can't currently run on non-delomboked code due to `@Getter(onMethod_ = {...})` annotations,
-          # see https://projectlombok.org/features/experimental/onX on the underlying mechanics
-          name: Check Javadoc correctness on delomboked code
-          command: |
-            LOMBOK_PROVIDED_BY=gradle-plugin ./gradlew javadoc
+#      - run:
+#          name: Run UI tests against 2020.1 (earliest supported)
+#          command: ./scripts/run-ui-tests 2020.1
+#      # We can't just store the results once at the end since they get overwritten with each UI test run.
+#      - store_test_results:
+#          path: uiTests/build/test-results/
+#      - run:
+#          name: Run UI tests against 2020.1.2 (latest non-EAP & our build target)
+#          command: ./scripts/run-ui-tests 2020.1.2
+#      - store_test_results:
+#          path: uiTests/build/test-results/
+#
+#      - run:
+#          # See Lombok config in build.gradle for why this step is necessary.
+#          # We're running this at the very end so that the recompiled code doesn't end up in the plugin artifact.
+#          name: Recompile production code with delombok
+#          # Apparently we need to kill the already-running daemons first, otherwise we might get an OOM.
+#          # New daemons will be spawned anyway since passing `LOMBOK_PROVIDED_BY=gradle-plugin` changes Gradle configuration.
+#          command: |
+#            ./gradlew --stop
+#            LOMBOK_PROVIDED_BY=gradle-plugin ./gradlew --max-workers=2 compileJava
+#      - run:
+#          # javadoc can't currently run on non-delomboked code due to `@Getter(onMethod_ = {...})` annotations,
+#          # see https://projectlombok.org/features/experimental/onX on the underlying mechanics
+#          name: Check Javadoc correctness on delomboked code
+#          command: |
+#            LOMBOK_PROVIDED_BY=gradle-plugin ./gradlew javadoc
 
   release:
     working_directory: ~/git-machete-intellij-plugin
@@ -93,41 +92,44 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          # It was hard to make `git push`/`hub pull-request` to work with SSH repo access in CI.
-          name: Reconfigure origin remote to https
-          command: git remote set-url origin https://${GITHUB_TOKEN}@github.com/VirtusLab/git-machete-intellij-plugin.git
-      - deploy:
-          name: Push git tag
-          command: |
-            source scripts/utils.sh
-            tag=v$(extract_version_from_current_wd)
-            git tag "$tag"
-            git push origin "$tag"
-      - deploy:
-          name: Create GitHub release
-          command: |
-            source scripts/utils.sh
-            tag=v$(extract_version_from_current_wd)
-            hub release create \
-              --attach build/distributions/git-machete-intellij-plugin-*.zip \
-              --message "$tag"$'\n\n'"$(<CHANGE-NOTES.html)" \
-              $tag
-      - deploy:
-          name: Open backport PR to develop
-          command: |
-            source scripts/utils.sh
-            version=$(extract_version_from_current_wd)
-            branch=backport/$version
-            git checkout -b "$branch"
-            git push origin "$branch"
-            hub pull-request \
-              --no-edit \
-              --base=develop \
-              --message="Backport release of v$version to develop" \
-              --labels=backport
-      - deploy:
-          name: Publish plugin to Jetbrains Marketplace
-          command: ./gradlew publishPlugin
+          name: Build plugin
+          command: ./gradlew --max-workers=2 buildPlugin
+#      - run:
+#          # It was hard to make `git push`/`hub pull-request` to work with SSH repo access in CI.
+#          name: Reconfigure origin remote to https
+#          command: git remote set-url origin https://${GITHUB_TOKEN}@github.com/VirtusLab/git-machete-intellij-plugin.git
+#      - deploy:
+#          name: Push git tag
+#          command: |
+#            source scripts/utils.sh
+#            tag=v$(extract_version_from_current_wd)
+#            git tag "$tag"
+#            git push origin "$tag"
+#      - deploy:
+#          name: Create GitHub release
+#          command: |
+#            source scripts/utils.sh
+#            tag=v$(extract_version_from_current_wd)
+#            hub release create \
+#              --attach build/distributions/git-machete-intellij-plugin-*.zip \
+#              --message "$tag"$'\n\n'"$(<CHANGE-NOTES.html)" \
+#              $tag
+#      - deploy:
+#          name: Open backport PR to develop
+#          command: |
+#            source scripts/utils.sh
+#            version=$(extract_version_from_current_wd)
+#            branch=backport/$version
+#            git checkout -b "$branch"
+#            git push origin "$branch"
+#            hub pull-request \
+#              --no-edit \
+#              --base=develop \
+#              --message="Backport release of v$version to develop" \
+#              --labels=backport
+#      - deploy:
+#          name: Publish plugin to Jetbrains Marketplace
+#          command: ./gradlew publishPlugin
 
 
 workflows:
@@ -135,14 +137,15 @@ workflows:
   workflow:
     jobs:
       - build
-      - hold: # A job that will require manual approval in the CircleCI web application.
-          type: approval
+      #      - hold: # A job that will require manual approval in the CircleCI web application.
+      #          type: approval
+      #          requires: [build]
+      #          filters:
+      #            branches:
+      #              only: bugfix/prevent-recompile-on-release
+      - release:
+      #          requires: [hold]
           requires: [build]
           filters:
             branches:
-              only: master
-      - release:
-          requires: [hold]
-          filters:
-            branches:
-              only: master
+              only: bugfix/prevent-recompile-on-release
