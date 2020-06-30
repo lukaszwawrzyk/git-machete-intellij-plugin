@@ -23,25 +23,27 @@ jobs:
       - run:
           name: Run post-compile checks
           command: ./scripts/verify-no-string-interpolation-leftovers
-      - run:
-          name: Run static code analyzer
-          command: ./gradlew --warn checkstyleMain
-
-      - run:
-          name: Compile tests
-          command: ./gradlew compileTestJava
-      - run:
-          name: Run backend tests
-          command: ./gradlew test
-      # Unfortunately, wildcards for test result paths aren't supported by CircleCI yet.
-      - store_test_results:
-          path: branchLayoutImpl/build/test-results/
-      - store_test_results:
-          path: backendImpl/build/test-results/
+      #      - run:
+      #          name: Run static code analyzer
+      #          command: ./gradlew --warn checkstyleMain
+      #
+      #      - run:
+      #          name: Compile tests
+      #          command: ./gradlew compileTestJava
+      #      - run:
+      #          name: Run backend tests
+      #          command: ./gradlew test
+      #      # Unfortunately, wildcards for test result paths aren't supported by CircleCI yet.
+      #      - store_test_results:
+      #          path: branchLayoutImpl/build/test-results/
+      #      - store_test_results:
+      #          path: backendImpl/build/test-results/
 
       - run:
           name: Build plugin artifact
-          command: ./gradlew buildPlugin
+          command: |
+            ./gradlew buildPlugin
+            find /root/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2/plugins/git4idea/lib/ -type f | xargs sha1sum
       - store_artifacts:
           path: build/distributions/
           destination: .
@@ -93,7 +95,20 @@ jobs:
           at: .
       - run:
           name: Build plugin
-          command: ./gradlew --max-workers=2 buildPlugin
+          command: |
+            #pre=$(find ~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2)
+            find /root/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2/plugins/git4idea/lib/ -type f | xargs sha1sum
+
+            ./gradlew --max-workers=2 resolveDependencies
+            #post=$(find ~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2)
+            #diff -u <(echo $pre) <(echo $post) || true
+            find /root/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2/plugins/git4idea/lib/ -type f | xargs sha1sum
+
+            ./gradlew --max-workers=2 --info buildPlugin
+            #final=$(find ~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2)
+            #diff -u <(echo $post) <(echo $final) || true
+            find /root/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2020.1.2/86566d2c582df026dd77c0c502a21dfac312563a/ideaIC-2020.1.2/plugins/git4idea/lib/ -type f | xargs sha1sum
+
 #      - run:
 #          # It was hard to make `git push`/`hub pull-request` to work with SSH repo access in CI.
 #          name: Reconfigure origin remote to https
